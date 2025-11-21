@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="text-center mt-5">
+    <h1>Welcome to Personal Budget Tracker</h1>
+    <p class="lead">Track your expenses, visualize spending and stay on top of your finances.</p>
+    <p>
+      <a class="btn btn-primary" href="{{ url_for('login') }}">Login</a>
+      <a class="btn btn-outline-primary" href="{{ url_for('register') }}">Register</a>
+    </p>
+  </div>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="row">
+    <div class="col-md-4">
+      <h3>Add Expense</h3>
+      <form method="post" action="{{ url_for('add_expense') }}">
+        <div class="mb-2">
+          <label class="form-label">Amount</label>
+          <input name="amount" type="number" step="0.01" class="form-control" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Category</label>
+          <input name="category" class="form-control" value="Other">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Date</label>
+          <input name="date" type="date" class="form-control">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Note</label>
+          <input name="note" class="form-control">
+        </div>
+        <button class="btn btn-primary">Add</button>
+      </form>
+
+      <hr>
+      <h4>Monthly budget</h4>
+      <div id="budget-section" class="mb-3">
+        <div id="budget-display" class="mb-2">Loading budget...</div>
+        <form id="budget-form" class="d-flex" onsubmit="return false;">
+          <input id="budget-input" name="budget" type="number" step="0.01" class="form-control me-2" placeholder="Monthly budget">
+          <button id="budget-save" class="btn btn-outline-primary">Save</button>
+        </form>
+      </div>
+
+      <hr>
+      <h4>Your recent expenses</h4>
+      <ul id="expense-list" class="list-group mb-4"></ul>
+    </div>
+    <div class="col-md-8">
+      <h3>Spending visualization</h3>
+      <div class="row">
+        <div class="col-md-6">
+          <canvas id="categoryChart"></canvas>
+        </div>
+        <div class="col-md-6">
+          <canvas id="monthChart"></canvas>
+        </div>
+      </div>
+      <div class="row mt-4">
+        <div class="col-md-6">
+          <canvas id="budgetChart"></canvas>
+        </div>
+        <div class="col-md-6">
+          <div id="saved-display" class="card p-3">
+            <h5>Savings Summary</h5>
+            <div id="saved-content">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{
+  "users": {
+    "soham": {
+      "password": "scrypt:32768:8:1$poEKfUOV7M6miR6G$c996a87ee93a77da6e0ab6ed5e1e31fc8235b1165cefb95da1066f93e9cb5de4a850a68f03860d3d3f0d6280afb6ca9b3aa173d6b6bf74b02a8e949d3d45600f",
+      "expenses": [
+        {
+          "id": "fc478aaa-fc40-4b6a-bb11-6d4da6ef34bc",
+          "amount": 2500.0,
+          "category": "Fees",
+          "date": "2025-11-21",
+          "note": ""
+        },
+        {
+          "id": "1fc854c8-e48e-48d6-856f-8ca30a2c997b",
+          "amount": 200.0,
+          "category": "Pizza",
+          "date": "2025-11-19",
+          "note": ""
+        }
+      ],
+      "monthly_budget": 5000.0
+    }
+  }
+}
