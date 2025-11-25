@@ -70,7 +70,7 @@ def verify_user(username, password):
     return check_password_hash(user['password'], password)
 
 
-def add_expense_for_user(username, amount, category, date_str=None, note=''):
+def add_expense_for_user(username, amount, category, date_str=None, note='', tx_type='expense'):
     db = read_db()
     user = db['users'].get(username)
     if user is None:
@@ -87,7 +87,9 @@ def add_expense_for_user(username, amount, category, date_str=None, note=''):
         'amount': float(amount),
         'category': category,
         'date': date.isoformat(),
-        'note': note
+        'note': note,
+        # default type is expense for backward compatibility
+        'type': tx_type or 'expense'
     }
     user['expenses'].append(expense)
     write_db(db)
@@ -115,16 +117,28 @@ def get_expenses(username):
 def summarize_expenses(username):
     expenses = get_expenses(username)
     by_category = {}
+    by_category_credits = {}
     by_month = {}
+    by_month_credits = {}
     for e in expenses:
         amt = float(e['amount'])
         cat = e.get('category', 'Other')
-        by_category[cat] = by_category.get(cat, 0) + amt
         # month key YYYY-MM
         m = e.get('date', '')[:7]
-        if m:
-            by_month[m] = by_month.get(m, 0) + amt
-    return {'by_category': by_category, 'by_month': by_month}
+        if e.get('type') == 'credit':
+            by_category_credits[cat] = by_category_credits.get(cat, 0) + amt
+            if m:
+                by_month_credits[m] = by_month_credits.get(m, 0) + amt
+        else:
+            by_category[cat] = by_category.get(cat, 0) + amt
+            if m:
+                by_month[m] = by_month.get(m, 0) + amt
+    return {
+        'by_category': by_category,
+        'by_category_credits': by_category_credits,
+        'by_month': by_month,
+        'by_month_credits': by_month_credits
+    }
 
 
 @app.route('/')
@@ -181,8 +195,9 @@ def add_expense():
     category = request.form.get('category', 'Other')
     date = request.form.get('date')
     note = request.form.get('note', '')
+    tx_type = request.form.get('type', 'expense')
     try:
-        add_expense_for_user(username, amount, category, date, note)
+        add_expense_for_user(username, amount, category, date, note, tx_type)
     except Exception as e:
         return redirect(url_for('dashboard'))
     return redirect(url_for('dashboard'))
@@ -205,12 +220,17 @@ def api_summary():
     # compute current month spent and include budget info
     today = datetime.utcnow().date()
     current_month = today.strftime('%Y-%m')
-    spent_current = summary.get('by_month', {}).get(current_month, 0)
+    expenses_current = summary.get('by_month', {}).get(current_month, 0)
+    credits_current = summary.get('by_month_credits', {}).get(current_month, 0)
+    # net spent = expenses - credits
+    net_spent = expenses_current - credits_current
     monthly_budget = get_monthly_budget(username)
-    remaining = monthly_budget - spent_current
+    remaining = monthly_budget - net_spent
     summary.update({
         'current_month': current_month,
-        'spent_current_month': spent_current,
+        'spent_current_month': net_spent,
+        'expenses_current_month': expenses_current,
+        'credits_current_month': credits_current,
         'monthly_budget': monthly_budget,
         'remaining': remaining
     })

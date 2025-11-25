@@ -19,6 +19,19 @@
         }
       ],
       "monthly_budget": 5000.0
+    },
+    "Sahil123": {
+      "password": "scrypt:32768:8:1$4bAiTqdk1k0GNISu$2d1cb9f6c7a80f4208dd7c23ef1840abf228d4fbc2fbb0cb2b2d9497c5484bc17d8dd8d60ddf8da1d4f055baa4ba2e88d2eb3bbaa30dd3961005f4032ebffc1b",
+      "expenses": [
+        {
+          "id": "c82b3434-d859-47cb-8e8b-9e17cee9dbb0",
+          "amount": 15450.0,
+          "category": "Personal",
+          "date": "2025-11-10",
+          "note": "waste"
+        }
+      ],
+      "monthly_budget": 500000000000.0
     }
   }
 }

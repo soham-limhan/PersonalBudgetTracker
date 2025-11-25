@@ -11,7 +11,10 @@ function renderExpenseList(expenses) {
   expenses.slice().reverse().forEach(e => {
     const li = document.createElement('li');
     li.className = 'list-group-item d-flex justify-content-between align-items-start';
-    li.innerHTML = `<div><strong>${e.category}</strong> <div class="small text-muted">${e.date} - ${e.note || ''}</div></div><div class="d-flex gap-2 align-items-center"><div class="badge bg-secondary rounded-pill">${e.amount}</div><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">Remove</button></div>`;
+    const isCredit = e.type === 'credit';
+    const badgeClass = isCredit ? 'badge bg-success rounded-pill' : 'badge bg-secondary rounded-pill';
+    const typeLabel = isCredit ? 'Credit' : 'Expense';
+    li.innerHTML = `<div><strong>${e.category} <small class="text-muted">(${typeLabel})</small></strong> <div class="small text-muted">${e.date} - ${e.note || ''}</div></div><div class="d-flex gap-2 align-items-center"><div class="${badgeClass}">${isCredit? '+' : '-'}${Number(e.amount).toFixed(2)}</div><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">Remove</button></div>`;
     el.appendChild(li);
   });
 }
@@ -38,12 +41,19 @@ function drawCategoryChart(ctx, data) {
   });
 }
 
-function drawMonthChart(ctx, data) {
-  const labels = Object.keys(data).sort();
-  const values = labels.map(k => data[k]);
+function drawMonthChart(ctx, expensesData, creditsData) {
+  const labels = Array.from(new Set([ ...Object.keys(expensesData || {}), ...Object.keys(creditsData || {}) ])).sort();
+  const expensesValues = labels.map(k => expensesData[k] || 0);
+  const creditsValues = labels.map(k => creditsData[k] || 0);
   return new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets: [{ label: 'Spending', data: values, borderColor: 'rgb(75, 192, 192)', tension: 0.3, fill: false }] },
+    data: {
+      labels,
+      datasets: [
+        { label: 'Spending', data: expensesValues, borderColor: 'rgb(255, 99, 132)', tension: 0.3, fill: false },
+        { label: 'Credits', data: creditsValues, borderColor: 'rgb(75, 192, 192)', tension: 0.3, fill: false }
+      ]
+    },
     options: { scales: { y: { beginAtZero: true } } }
   });
 }
@@ -98,23 +108,34 @@ async function init() {
     const catCtx = document.getElementById('categoryChart').getContext('2d');
     const monCtx = document.getElementById('monthChart').getContext('2d');
     const budCtx = document.getElementById('budgetChart').getContext('2d');
-    drawCategoryChart(catCtx, summary.by_category || {});
-    drawMonthChart(monCtx, summary.by_month || {});
+    // Combine expense categories and credit categories (credit labels prefixed)
+    const combinedCategory = Object.assign({}, summary.by_category || {});
+    if (summary.by_category_credits) {
+      Object.keys(summary.by_category_credits).forEach(k => {
+        combinedCategory[`Credit: ${k}`] = summary.by_category_credits[k];
+      });
+    }
+    drawCategoryChart(catCtx, combinedCategory);
+    drawMonthChart(monCtx, summary.by_month || {}, summary.by_month_credits || {});
 
     const budget = Number(summary.monthly_budget ?? budgetResp.monthly_budget) || 0;
     const currentMonth = summary.current_month || new Date().toISOString().slice(0,7);
 
-    // Filter expenses for the current month (YYYY-MM prefix)
+    // Filter transactions for the current month (YYYY-MM prefix)
     const expensesForMonth = (expenses || []).filter(e => e.date && e.date.startsWith(currentMonth)).map(e => ({
       id: e.id,
       amount: Number(e.amount) || 0,
       note: e.note || '',
-      category: e.category || 'Other'
+      category: e.category || 'Other',
+      type: e.type || 'expense'
     }));
 
-    drawBudgetPie(budCtx, budget, expensesForMonth);
+    // For the budget pie we show only expenses (not credits)
+    const expensesOnly = expensesForMonth.filter(e => e.type !== 'credit');
+    drawBudgetPie(budCtx, budget, expensesOnly);
 
-    const spent = expensesForMonth.reduce((s, e) => s + e.amount, 0);
+    // Compute net spent (expenses minus credits)
+    const spent = expensesForMonth.reduce((s, e) => s + (e.type === 'credit' ? -e.amount : e.amount), 0);
     const remaining = Math.max(0, budget - spent);
     updateBudgetDisplay(budget, spent, remaining, currentMonth);
     updateSavedDisplay(budget, expensesForMonth, spent, remaining);
@@ -134,7 +155,12 @@ function updateSavedDisplay(budget, expensesForMonth, spent, remaining) {
   if (expensesForMonth.length === 0) {
     itemsHtml = '<div class="mb-2 text-muted">No expenses this month</div>';
   } else {
-    itemsHtml = '<ul class="list-unstyled mb-2">' + expensesForMonth.map(e => `<li>${(e.note && e.note.trim())? e.note : e.category}: <span class=\"text-danger\">$${e.amount.toFixed(2)}</span></li>`).join('') + '</ul>';
+      itemsHtml = '<ul class="list-unstyled mb-2">' + expensesForMonth.map(e => {
+        const isCredit = e.type === 'credit';
+        const amt = (isCredit ? '+' : '-') + '$' + (e.amount || 0).toFixed(2);
+        const cls = isCredit ? 'text-success' : 'text-danger';
+        return `<li>${(e.note && e.note.trim())? e.note : e.category}: <span class="${cls}">${amt}</span></li>`;
+      }).join('') + '</ul>';
   }
 
   el.innerHTML = `
