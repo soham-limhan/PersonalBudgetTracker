@@ -8,16 +8,18 @@ async function fetchJson(path) {
 function renderExpenseList(expenses) {
   const el = document.getElementById('expense-list');
   el.innerHTML = '';
-  expenses.slice().reverse().forEach(e => {
+  expenses.slice().reverse().forEach((e, index) => {
     const li = document.createElement('li');
     li.className = 'list-group-item d-flex justify-content-between align-items-start';
+    li.style.animationDelay = `${index * 0.05}s`;
     const isCredit = e.type === 'credit';
     const badgeClass = isCredit ? 'badge bg-success rounded-pill' : 'badge bg-secondary rounded-pill';
     const typeLabel = isCredit ? 'Credit' : 'Expense';
-    li.innerHTML = `<div><strong>${e.category} <small class="text-muted">(${typeLabel})</small></strong> <div class="small text-muted">${e.date} - ${e.note || ''}</div></div><div class="d-flex gap-2 align-items-center"><div class="${badgeClass}">${isCredit? '+' : '-'}${Number(e.amount).toFixed(2)}</div><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">Remove</button></div>`;
+    li.innerHTML = `<div><strong>${e.category} <small class="text-muted">(${typeLabel})</small></strong> <div class="small text-muted">${e.date} - ${e.note || ''}</div></div><div class="d-flex gap-2 align-items-center"><div class="${badgeClass}">${isCredit ? '+' : '-'}${Number(e.amount).toFixed(2)}</div><button class="btn btn-sm btn-danger" onclick="deleteExpense('${e.id}')">🗑️ Remove</button></div>`;
     el.appendChild(li);
   });
 }
+
 
 async function deleteExpense(expenseId) {
   if (!confirm('Are you sure you want to remove this expense?')) return;
@@ -36,13 +38,13 @@ function drawCategoryChart(ctx, data) {
   const values = labels.map(k => data[k]);
   return new Chart(ctx, {
     type: 'pie',
-    data: { labels, datasets: [{ data: values, backgroundColor: labels.map((_,i)=>`hsl(${(i*47)%360} 70% 55%)`) }] },
+    data: { labels, datasets: [{ data: values, backgroundColor: labels.map((_, i) => `hsl(${(i * 47) % 360} 70% 55%)`) }] },
     options: { plugins: { legend: { position: 'bottom' } } }
   });
 }
 
 function drawMonthChart(ctx, expensesData, creditsData) {
-  const labels = Array.from(new Set([ ...Object.keys(expensesData || {}), ...Object.keys(creditsData || {}) ])).sort();
+  const labels = Array.from(new Set([...Object.keys(expensesData || {}), ...Object.keys(creditsData || {})])).sort();
   const expensesValues = labels.map(k => expensesData[k] || 0);
   const creditsValues = labels.map(k => creditsData[k] || 0);
   return new Chart(ctx, {
@@ -72,19 +74,39 @@ function drawBudgetChart(ctx, budget, spent, remaining) {
   });
 }
 function drawBudgetPie(ctx, budget, expensesForMonth) {
-  // Build labels and values from individual expenses, then add Remaining slice
+  // Build labels and values from individual transactions (expenses and credits), then add Remaining slice
   const values = [];
   const labels = [];
   const colors = [];
-  expensesForMonth.forEach((e, i) => {
+
+  // Separate expenses and credits
+  const expenses = expensesForMonth.filter(e => e.type !== 'credit');
+  const credits = expensesForMonth.filter(e => e.type === 'credit');
+
+  // Add expenses
+  expenses.forEach((e, i) => {
     const amt = Number(e.amount) || 0;
     const label = (e.note && e.note.trim()) ? `${e.note}` : (e.category || 'Expense');
     labels.push(`${label}`);
     values.push(amt);
     colors.push(`hsl(${(i * 47) % 360} 70% 55%)`);
   });
-  const spent = values.reduce((s, v) => s + v, 0);
-  const remaining = Math.max(0, (Number(budget) || 0) - spent);
+
+  // Add credits with green shades
+  credits.forEach((e, i) => {
+    const amt = Number(e.amount) || 0;
+    const label = (e.note && e.note.trim()) ? `Credit: ${e.note}` : `Credit: ${e.category || 'Other'}`;
+    labels.push(`${label}`);
+    values.push(amt);
+    colors.push(`hsl(${120 + (i * 20) % 60} 60% 50%)`); // Green shades
+  });
+
+  // Calculate total spent (expenses - credits)
+  const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const totalCredits = credits.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const netSpent = totalExpenses - totalCredits;
+
+  const remaining = Math.max(0, (Number(budget) || 0) - netSpent);
   if (remaining > 0) {
     labels.push('Remaining');
     values.push(remaining);
@@ -119,7 +141,7 @@ async function init() {
     drawMonthChart(monCtx, summary.by_month || {}, summary.by_month_credits || {});
 
     const budget = Number(summary.monthly_budget ?? budgetResp.monthly_budget) || 0;
-    const currentMonth = summary.current_month || new Date().toISOString().slice(0,7);
+    const currentMonth = summary.current_month || new Date().toISOString().slice(0, 7);
 
     // Filter transactions for the current month (YYYY-MM prefix)
     const expensesForMonth = (expenses || []).filter(e => e.date && e.date.startsWith(currentMonth)).map(e => ({
@@ -130,9 +152,8 @@ async function init() {
       type: e.type || 'expense'
     }));
 
-    // For the budget pie we show only expenses (not credits)
-    const expensesOnly = expensesForMonth.filter(e => e.type !== 'credit');
-    drawBudgetPie(budCtx, budget, expensesOnly);
+    // Pass all transactions (expenses + credits) to the pie chart
+    drawBudgetPie(budCtx, budget, expensesForMonth);
 
     // Compute net spent (expenses minus credits)
     const spent = expensesForMonth.reduce((s, e) => s + (e.type === 'credit' ? -e.amount : e.amount), 0);
@@ -155,12 +176,12 @@ function updateSavedDisplay(budget, expensesForMonth, spent, remaining) {
   if (expensesForMonth.length === 0) {
     itemsHtml = '<div class="mb-2 text-muted">No expenses this month</div>';
   } else {
-      itemsHtml = '<ul class="list-unstyled mb-2">' + expensesForMonth.map(e => {
-        const isCredit = e.type === 'credit';
-        const amt = (isCredit ? '+' : '-') + '$' + (e.amount || 0).toFixed(2);
-        const cls = isCredit ? 'text-success' : 'text-danger';
-        return `<li>${(e.note && e.note.trim())? e.note : e.category}: <span class="${cls}">${amt}</span></li>`;
-      }).join('') + '</ul>';
+    itemsHtml = '<ul class="list-unstyled mb-2">' + expensesForMonth.map(e => {
+      const isCredit = e.type === 'credit';
+      const amt = (isCredit ? '+' : '-') + '$' + (e.amount || 0).toFixed(2);
+      const cls = isCredit ? 'text-success' : 'text-danger';
+      return `<li>${(e.note && e.note.trim()) ? e.note : e.category}: <span class="${cls}">${amt}</span></li>`;
+    }).join('') + '</ul>';
   }
 
   el.innerHTML = `
@@ -180,29 +201,54 @@ function updateSavedDisplay(budget, expensesForMonth, spent, remaining) {
 function updateBudgetDisplay(budget, spent, remaining, month) {
   const el = document.getElementById('budget-display');
   if (!el) return;
-  const m = month || new Date().toISOString().slice(0,7);
+  const m = month || new Date().toISOString().slice(0, 7);
   el.innerHTML = `<div><strong>${m}</strong> — Budget: <span class="fw-bold">${budget.toFixed(2)}</span>, Spent: <span class="fw-bold text-danger">${spent.toFixed(2)}</span>, Remaining: <span class="fw-bold text-success">${remaining.toFixed(2)}</span></div>`;
 }
 
-function attachBudgetHandler(){
+function attachBudgetHandler() {
   const form = document.getElementById('budget-form');
   if (!form) return;
   const input = document.getElementById('budget-input');
   const btn = document.getElementById('budget-save');
-  form.addEventListener('submit', async (e)=>{
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const val = parseFloat(input.value || 0);
-    try{
-      const r = await fetch('/api/budget', { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({amount: val}) });
+    try {
+      const r = await fetch('/api/budget', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: val }) });
       if (!r.ok) throw new Error('Could not save');
       const data = await r.json();
       // refresh summary to update display
       const summary = await fetchJson('/api/summary');
       updateBudgetDisplay(data.monthly_budget || 0, summary.spent_current_month || 0, summary.remaining || 0, summary.current_month);
       input.value = '';
-    }catch(err){
+      init(); // Refresh all charts
+    } catch (err) {
       console.error('Failed to save budget', err);
       alert('Failed to save budget');
+    }
+  });
+
+  // Add handler for budget credit form
+  const creditForm = document.getElementById('budget-credit-form');
+  if (!creditForm) return;
+  const creditInput = document.getElementById('budget-credit-input');
+  const creditBtn = document.getElementById('budget-credit-save');
+  creditForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const val = parseFloat(creditInput.value || 0);
+    if (val <= 0) {
+      alert('Please enter a positive amount');
+      return;
+    }
+    try {
+      const r = await fetch('/api/budget', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: val, operation: 'add' }) });
+      if (!r.ok) throw new Error('Could not add credit');
+      const data = await r.json();
+      creditInput.value = '';
+      init(); // Refresh all charts and displays
+    } catch (err) {
+      console.error('Failed to add credit to budget', err);
+      alert('Failed to add credit to budget');
     }
   });
 }

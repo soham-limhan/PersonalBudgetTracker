@@ -32,6 +32,44 @@
         }
       ],
       "monthly_budget": 500000000000.0
+    },
+    "testuser": {
+      "password": "scrypt:32768:8:1$DEn5wNTM8lbJu7wl$cef596fb047801d2014b9e834f65886569fbc9369ef02fcfb447b85a931cdcbc5ad799f536f096f30333d25c8592255f0427a3a3d555bdb8436deec96f1fe8d4",
+      "expenses": [
+        {
+          "id": "c472402d-79e4-4bba-82b1-0f407a7c105e",
+          "amount": 50.0,
+          "category": "Groceries",
+          "date": "2025-12-18",
+          "note": "",
+          "type": "expense"
+        },
+        {
+          "id": "093f4a48-7c6c-47f3-b62d-28bf9509c41c",
+          "amount": 50.0,
+          "category": "Groceries",
+          "date": "2025-12-18",
+          "note": "",
+          "type": "expense"
+        },
+        {
+          "id": "5c82240a-8041-4a2d-bd89-3b0b54a27d7b",
+          "amount": 30.0,
+          "category": "Transport",
+          "date": "2025-12-18",
+          "note": "",
+          "type": "expense"
+        },
+        {
+          "id": "610d4eef-7efa-4453-8783-a5a05a434439",
+          "amount": 20.0,
+          "category": "Refund",
+          "date": "2025-12-18",
+          "note": "",
+          "type": "credit"
+        }
+      ],
+      "monthly_budget": 1200.0
     }
   }
 }

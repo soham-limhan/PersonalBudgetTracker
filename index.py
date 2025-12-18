@@ -70,6 +70,21 @@ def verify_user(username, password):
     return check_password_hash(user['password'], password)
 
 
+def update_user_password(username, current_password, new_password):
+    """Update user password after verifying current password"""
+    db = read_db()
+    user = db['users'].get(username)
+    if not user:
+        return False, 'User not found'
+    # Verify current password
+    if not check_password_hash(user['password'], current_password):
+        return False, 'Current password is incorrect'
+    # Update to new password
+    user['password'] = generate_password_hash(new_password)
+    write_db(db)
+    return True, 'Password updated successfully'
+
+
 def add_expense_for_user(username, amount, category, date_str=None, note='', tx_type='expense'):
     db = read_db()
     user = db['users'].get(username)
@@ -179,6 +194,37 @@ def logout():
     return redirect(url_for('home'))
 
 
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        username = session['username']
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        
+        # Validate inputs
+        if not current_password or not new_password or not confirm_password:
+            return render_template('reset_password.html', error='All fields are required')
+        
+        if new_password != confirm_password:
+            return render_template('reset_password.html', error='New passwords do not match')
+        
+        if len(new_password) < 4:
+            return render_template('reset_password.html', error='New password must be at least 4 characters')
+        
+        # Update password
+        success, message = update_user_password(username, current_password, new_password)
+        if success:
+            return render_template('reset_password.html', success=message)
+        else:
+            return render_template('reset_password.html', error=message)
+    
+    return render_template('reset_password.html')
+
+
 @app.route('/dashboard')
 def dashboard():
     if 'username' not in session:
@@ -247,10 +293,18 @@ def api_budget():
     # POST: accept json or form
     data = request.get_json(silent=True) or request.form
     amount = data.get('amount') or data.get('budget') or data.get('monthly_budget')
+    operation = data.get('operation', 'set')  # 'set' or 'add'
     if amount is None:
         return jsonify({'error': 'missing amount'}), 400
     try:
-        set_monthly_budget(username, amount)
+        if operation == 'add':
+            # Add to existing budget
+            current_budget = get_monthly_budget(username)
+            new_budget = current_budget + float(amount)
+            set_monthly_budget(username, new_budget)
+        else:
+            # Set/replace budget
+            set_monthly_budget(username, amount)
     except Exception:
         return jsonify({'error': 'could not set budget'}), 500
     return jsonify({'monthly_budget': get_monthly_budget(username)})
